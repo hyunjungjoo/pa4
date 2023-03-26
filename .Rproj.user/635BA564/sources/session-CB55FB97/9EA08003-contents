@@ -1,0 +1,62 @@
+---
+title: "index.Rmd"
+date: "2023-02-22"
+author: Hyunjung Joo
+output: html_document
+---
+
+```{r, 'setup', warning=FALSE, message=FALSE}
+library(languageR)
+library(tidyverse)
+```
+
+### Data load
+```{r, 'load data'}
+head(durationsOnt)
+str(durationsOnt)
+```
+
+
+### Tidy data
+```{r, 'tidy data'}
+
+my_data_long <- durationsOnt %>%
+  select(-DurationOfPrefix) %>%
+  pivot_longer(., col = DurationPrefixVowel:DurationPrefixPlosive,     
+               names_to = "PrefixSegment", 
+               values_to = "DurationOfPrefix")
+  
+my_data_long$PrefixSegment <- gsub("DurationPrefix","",my_data_long$PrefixSegment)
+head(my_data_long)
+```
+
+### Descriptive statistics
+```{r, 'descriptive statistics'}
+my_data_long %>%
+  group_by(PrefixSegment) %>%
+  summarize(avg = mean(DurationOfPrefix),
+            sd = sd(DurationOfPrefix),
+            min = min(DurationOfPrefix),
+            max = max(DurationOfPrefix))
+```
+
+### Bivariate regression
+```{r, 'bivariate regression'}
+mod1 <- lm(DurationOfPrefix ~ SpeechRate, data = my_data_long)
+summary(mod1)
+```
+
+### Plot
+```{r, 'plot'}
+my_data_long %>%
+  ggplot() +
+  aes(x = DurationOfPrefix, y = SpeechRate) + 
+  geom_point() +
+  geom_smooth(method = "lm")+
+  labs(x = "Duration of Prefix", y = "Speech Rate") + 
+  theme(axis.title=element_text(size=14))
+
+```
+
+### Observation
+##### In the scattor plot, it seems that the dots are gathered in the middle of the coordinate plane, but the regression line shows that there is a negative correlation between duration of prefix and speech rate. That is, if the duration of prefix increases, the speech rate decreases. In the bivariate regression analysis, the intercept and slope of the regression line is 0.064360 and -0.002656, respectively, showing a negative correlation between duration of prefix and speech rate. The effect of duration of prefix on speech rate turned out to be significant in the analysis (p < .027).  

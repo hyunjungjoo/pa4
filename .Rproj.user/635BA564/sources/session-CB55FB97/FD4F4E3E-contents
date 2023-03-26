@@ -1,0 +1,97 @@
+library("tidyverse")
+library("ds4ling")
+library("patchwork")
+library("ggfortify")
+library("ggplot2")
+library("lmtest")
+
+##4 Load the dataset from inside your index.Rmd file.
+data <- read_csv(file = here("data_raw", "fricatives", "fricatives.csv")
+
+
+##5 Tidy the data and save the tidy version as a .csv file in data_tidy.
+
+data_tidy <- data %>%
+  pivot_longer(, col = c("s_cog","sh_cog","s_skewness","sh_skewness"),
+               names_to = "names", 
+               values_to = "values") %>%
+  separate(names, c("phoneme", "measure"), "_") %>%
+  write_csv(file = "./data_tidy/fricatives_tidy.csv")
+
+##6 Provide a table of descriptive statistics.
+
+data_tidy %>%
+  group_by(phoneme, measure) %>%
+  summarize(avg = mean(values),
+            sd = sd(values))
+
+##7 Make a boxplot of center of gravity as a function of phoneme. 
+##  In another slide, plot skewness as a function of phoneme. 
+##  Use a statistical transformation (i.e., not a boxplot, but rather stat_summary()).
+
+data_v2 <- data_tidy %>%
+  pivot_wider(, names_from = "measure", values_from = "values")
+
+data_v2 %>%
+  ggplot() +
+  aes(x = phoneme, y = cog) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(size=14), 
+        axis.text.y = element_text(size=10),
+        axis.title.x = element_text(size=14,face="bold"), 
+        axis.title.y = element_text(size=14,face="bold"))+
+  labs(x = "Phoneme", y = "Center of gravity") 
+
+data_v2 %>%
+  ggplot() +
+  aes(x = phoneme, y = skewness) +
+  stat_summary(fun = mean, geom = "line", size=1.3)+
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = .25) +
+  stat_summary(fun = mean, geom = "point", size = 4, fill='black', pch = 21) +
+  theme(axis.text.x = element_text(size=14), 
+        axis.text.y = element_text(size=10),
+        axis.title.x = element_text(size=14,face="bold"), 
+        axis.title.y = element_text(size=14,face="bold"))+
+  labs(x = "Phoneme", y = "Skewness") 
+
+##8 Fit a model that examines center of gravity as a function of skewness 
+##  for the [s] segments (hint: you will have to transform the data). 
+##  Make a table of the model summary.
+
+data_wide <- data_v2 %>%
+  pivot_wider(.,names_from = phoneme, values_from = c(cog, skewness))
+
+mod1 <- lm(cog_s ~ skewness_s, data = data_wide)
+summary(mod1)
+
+##9 Make a scatter plot that illustrates the relationship in (8).
+head(data_wide)
+data_wide %>%
+  ggplot() +
+  aes(x = cog_s, y = skewness_s) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+##10 Check model diagnostics (make plots).
+
+acf(mod1$residuals)   # visual inspection
+lmtest::dwtest(mod1)
+
+autoplot(mod1, which = 2)
+
+cor.test(data_wide$skewness_s, mod1$residuals)
+
+##11 Write up the results (as if it were for a journal article).
+
+
+##12 In a new slide, load the assumptions.csv dataset. 
+##   Make a scatterplot. Explain in a few sentences why it would not be appropriate 
+##   to fit a model to this data.
+
+assumptions <- read_csv(file = "./data_raw/fricatives/assumptions.csv")
+
+assumptions %>%
+  ggplot() +
+  aes(x, y) +
+  geom_point()
+ds4ling::diagnosis() 

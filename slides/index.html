@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>pa4</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Hyunjung Joo" />
+    <script src="libs/header-attrs-2.20/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# pa4
+]
+.author[
+### Hyunjung Joo
+]
+.institute[
+### Rutgers University
+]
+
+---
+
+
+#1. Setup and data load
+
+```r
+library("tidyverse")
+library("ds4ling")
+library("patchwork")
+library("ggfortify")
+library("ggplot2")
+library("lmtest")
+library("here")
+library("untidydata")
+library("broom")
+```
+
+
+```r
+data &lt;- read_csv(file = here("data_raw", "fricatives","fricatives.csv"))
+```
+---
+#2. Tidying the data
+
+```r
+data_tidy &lt;- data %&gt;%
+  pivot_longer(, col = c("s_cog","sh_cog","s_skewness","sh_skewness"),
+               names_to = "names", 
+               values_to = "values") %&gt;%
+  separate(names, c("phoneme", "measure"), "_") %&gt;%
+  write_csv(file = here("data_tidy", "fricatives_tidy.csv"))
+head(data_tidy)
+```
+
+```
+## # A tibble: 6 × 4
+##     obs phoneme measure    values
+##   &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;       &lt;dbl&gt;
+## 1     1 s       cog      3285.   
+## 2     1 sh      cog      2409.   
+## 3     1 s       skewness   -1.22 
+## 4     1 sh      skewness   -0.248
+## 5     2 s       cog      4664.   
+## 6     2 sh      cog      2823.
+```
+---
+#3. Descriptive statistics
+
+```r
+data_tidy %&gt;%
+  group_by(phoneme, measure) %&gt;%
+  summarize(avg = mean(values),
+            sd = sd(values)) %&gt;%  
+  mutate_if(is.numeric, round, digits = 2) %&gt;%
+  knitr::kable()
+```
+
+
+
+|phoneme |measure  |     avg|     sd|
+|:-------|:--------|-------:|------:|
+|s       |cog      | 5690.52| 913.25|
+|s       |skewness |   -0.77|   0.28|
+|sh      |cog      | 3994.82| 697.09|
+|sh      |skewness |    0.55|   0.44|
+---
+#4. Center of gravity as a function of Phoneme
+
+```r
+data_v2 &lt;- data_tidy %&gt;%
+  pivot_wider(., names_from = "measure", values_from = "values")
+data_v2 %&gt;%
+  ggplot(aes(x = phoneme, y = cog)) +
+  geom_boxplot() + labs(x = "Phoneme", y = "Center of gravity") 
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-2-1.png" width="400px" height="350px" style="display: block; margin: auto;" /&gt;
+---
+#5. Skewness as a function of Phoneme
+
+
+```r
+data_v2 %&gt;%
+  ggplot(aes(x = phoneme, y = skewness)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = .25) +
+  stat_summary(fun = mean, geom = "point", size = 4, fill='black', pch = 21) +
+  labs(x = "Phoneme", y = "Skewness") 
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-3-1.png" width="400px" height="350px" style="display: block; margin: auto;" /&gt;
+---
+#6. Center of gravity as a function of skewness for [s]
+###Statistical analysis
+
+```r
+data_wide &lt;- data_v2 %&gt;%
+  pivot_wider(.,names_from = phoneme, values_from = c(cog, skewness))
+
+mod1 &lt;- lm(cog_s ~ skewness_s, data = data_wide)
+tidy(mod1) %&gt;% 
+  mutate_if(is.numeric, round, digits = 2) %&gt;%
+  knitr::kable()
+```
+
+
+
+|term        | estimate| std.error| statistic| p.value|
+|:-----------|--------:|---------:|---------:|-------:|
+|(Intercept) |  8027.24|    212.33|     37.80|       0|
+|skewness_s  |  3029.10|    259.14|     11.69|       0|
+---
+#6. Center of gravity as a function of skewness for [s]
+###Plot
+
+```r
+data_wide %&gt;%
+  ggplot(aes(x = skewness_s, y = cog_s)) +
+  geom_point() + geom_smooth(method = "lm")
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-5-1.png" width="400px" height="350px" style="display: block; margin: auto;" /&gt;
+---
+#7. Diagnostics
+###The mean of residuals is zero
+
+```r
+summary(mod1$residuals) 
+```
+
+```
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## -1060.74   -21.72    58.96     0.00   123.00   405.24
+```
+---
+#7. Diagnostics
+###Homoskedasticity and normality of residuals
+
+```r
+autoplot(mod1, which = c(1,2))
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-7-1.png" width="90%" style="display: block; margin: auto;" /&gt;
+---
+#7. Diagnostics
+###No autocorrelation of residuals
+
+```r
+acf(mod1$residuals) 
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-8-1.png" width="400px" height="350px" style="display: block; margin: auto;" /&gt;
+---
+#7. Diagnostics
+###No autocorrelation of residuals
+
+```
+## 
+## 	Durbin-Watson test
+## 
+## data:  mod1
+## DW = 1.3028, p-value = 0.02841
+## alternative hypothesis: true autocorrelation is greater than 0
+```
+---
+#7. Diagnostics
+###Predictors and residuals are uncorrelated
+
+```r
+cor.test(data_wide$skewness_s, mod1$residuals)
+```
+
+```
+## 
+## 	Pearson's product-moment correlation
+## 
+## data:  data_wide$skewness_s and mod1$residuals
+## t = -1.586e-15, df = 18, p-value = 1
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  -0.4425208  0.4425208
+## sample estimates:
+##           cor 
+## -3.738269e-16
+```
+---
+#8. Results
+###General description
+The production data for fricatives were analyzed using a linear model to test the effect of *Skewness* for [s] segment on *Center of gravity*. *Center of gravity* was included as a dependent variable, while *Skewness* was included as a fixed effect. Visual inspection of Q-Q plots and plots of residuals against fitted values revealed no discernable deviations from normality and homoskedasticity. Multiple and adjusted R-squared are provide for the indication of goodness of fit for the model. p-values less than .05 were reported as significant.
+
+###Results
+The table in slide 7 summarizes *Center of gravity* as a function of *Skewness* for [s] segment. The model accounted for the variance for 88% (Multiple R-squared:  0.88, Adjusted R-squared:  0.87). As illustrated in the graph in slide 8, *Center of gravity* showed a linear relationship with *Skewness* for [s] segment (b = 3029.1, SE: 259.1, t = 11.69, p &lt;.001). Specifically, as for [s] segment, one unit change in skewness was associated with an increase of center of gravity by 3029. Thus, the results show that when *Skewness* increases, *Center of gravity* increases in a linear way.
+
+---
+#9. Assumptions.csv
+.pull-left[
+
+```r
+assumptions &lt;- read_csv(file = here("data_raw", "fricatives", "assumptions.csv"))
+assumptions %&gt;%
+  ggplot(aes(x, y)) + geom_point()
+```
+
+&lt;img src="index_files/figure-html/unnamed-chunk-11-1.png" width="400px" height="350px" style="display: block; margin: auto auto auto 0;" /&gt;
+]
+.pull-right[
+As shown in the plot on the left, there is neither linear or non-linear relationship between *x* and *y*. There is no particular pattern of *y* as a function of *x*, because there are multiple values of *y* that correspond to the same *x*. Therefore, there is no model that fits this data. 
+]
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

@@ -1,0 +1,147 @@
+---
+title: "pa4"
+author: "Hyunjung Joo"
+institute: "Rutgers University"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+#1. Setup and data load
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
+library("tidyverse")
+library("ds4ling")
+library("patchwork")
+library("ggfortify")
+library("ggplot2")
+library("lmtest")
+library("here")
+library("untidydata")
+library("broom")
+```
+
+```{r, load-data, message=FALSE, out.width="50%", fig.height=3, fig.retina=2}
+
+data <- read_csv(file = here("data_raw", "fricatives","fricatives.csv"))
+
+```
+---
+#2. Tidying the data
+```{r, tidy, message=FALSE,message=FALSE, out.width="50%", fig.height=3, fig.retina=2}
+
+data_tidy <- data %>%
+  pivot_longer(, col = c("s_cog","sh_cog","s_skewness","sh_skewness"),
+               names_to = "names", 
+               values_to = "values") %>%
+  separate(names, c("phoneme", "measure"), "_") %>%
+  write_csv(file = here("data_tidy", "fricatives_tidy.csv"))
+head(data_tidy)
+```
+---
+#3. Descriptive statistics
+```{r, message=FALSE}
+
+data_tidy %>%
+  group_by(phoneme, measure) %>%
+  summarize(avg = mean(values),
+            sd = sd(values)) %>%  
+  mutate_if(is.numeric, round, digits = 2) %>%
+  knitr::kable()
+
+```
+---
+#4. Center of gravity as a function of Phoneme
+```{r, message=FALSE, out.width="400px", out.height="350px",fig.align='center'}
+data_v2 <- data_tidy %>%
+  pivot_wider(., names_from = "measure", values_from = "values")
+data_v2 %>%
+  ggplot(aes(x = phoneme, y = cog)) +
+  geom_boxplot() + labs(x = "Phoneme", y = "Center of gravity") 
+
+```
+---
+#5. Skewness as a function of Phoneme
+
+```{r, message=FALSE, out.width="400px", out.height="350px", fig.align='center'}
+data_v2 %>%
+  ggplot(aes(x = phoneme, y = skewness)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = .25) +
+  stat_summary(fun = mean, geom = "point", size = 4, fill='black', pch = 21) +
+  labs(x = "Phoneme", y = "Skewness") 
+```
+---
+#6. Center of gravity as a function of skewness for [s]
+###Statistical analysis
+```{r, message=FALSE}
+data_wide <- data_v2 %>%
+  pivot_wider(.,names_from = phoneme, values_from = c(cog, skewness))
+
+mod1 <- lm(cog_s ~ skewness_s, data = data_wide)
+tidy(mod1) %>% 
+  mutate_if(is.numeric, round, digits = 2) %>%
+  knitr::kable()
+```
+---
+#6. Center of gravity as a function of skewness for [s]
+###Plot
+```{r, message=FALSE, out.width="400px", out.height="350px", fig.align='center'}
+data_wide %>%
+  ggplot(aes(x = skewness_s, y = cog_s)) +
+  geom_point() + geom_smooth(method = "lm")
+```
+---
+#7. Diagnostics
+###The mean of residuals is zero
+```{r, message=FALSE}
+summary(mod1$residuals) 
+
+```
+---
+#7. Diagnostics
+###Homoskedasticity and normality of residuals
+```{r, message=FALSE,out.width="90%", fig.height=2.5, fig.align='center'}
+autoplot(mod1, which = c(1,2))
+```
+---
+#7. Diagnostics
+###No autocorrelation of residuals
+```{r, message=FALSE, out.width="400px", out.height="350px", fig.align='center'}
+acf(mod1$residuals) 
+```
+---
+#7. Diagnostics
+###No autocorrelation of residuals
+```{r, message=FALSE, echo=FALSE}
+lmtest::dwtest(mod1)
+```
+---
+#7. Diagnostics
+###Predictors and residuals are uncorrelated
+```{r, message=FALSE}
+cor.test(data_wide$skewness_s, mod1$residuals)
+```
+---
+#8. Results
+###General description
+The production data for fricatives were analyzed using a linear model to test the effect of *Skewness* for [s] segment on *Center of gravity*. *Center of gravity* was included as a dependent variable, while *Skewness* was included as a fixed effect. Visual inspection of Q-Q plots and plots of residuals against fitted values revealed no discernable deviations from normality and homoskedasticity. Multiple and adjusted R-squared are provide for the indication of goodness of fit for the model. p-values less than .05 were reported as significant.
+
+###Results
+The table in slide 7 summarizes *Center of gravity* as a function of *Skewness* for [s] segment. The model accounted for the variance for 88% (Multiple R-squared:  0.88, Adjusted R-squared:  0.87). As illustrated in the graph in slide 8, *Center of gravity* showed a linear relationship with *Skewness* for [s] segment (b = 3029.1, SE: 259.1, t = 11.69, p <.001). Specifically, as for [s] segment, one unit change in skewness was associated with an increase of center of gravity by 3029. Thus, the results show that when *Skewness* increases, *Center of gravity* increases in a linear way.
+
+---
+#9. Assumptions.csv
+.pull-left[
+```{r, message=FALSE, out.width="400px", out.height="350px", fig.align='left'}
+assumptions <- read_csv(file = here("data_raw", "fricatives", "assumptions.csv"))
+assumptions %>%
+  ggplot(aes(x, y)) + geom_point()
+```
+]
+.pull-right[
+As shown in the plot on the left, there is neither linear or non-linear relationship between *x* and *y*. There is no particular pattern of *y* as a function of *x*, because there are multiple values of *y* that correspond to the same *x*. Therefore, there is no model that fits this data. 
+]

@@ -1,0 +1,128 @@
+---
+title: "MRC_examples"
+output: html_document
+date: "2023-03-06"
+editor_options: 
+  chunk_output_type: console
+---
+
+## Setup
+```{r, message=FALSE, warning=FALSE}
+
+
+library("tidyverse")
+library("ds4ling")
+library("untidydata")
+library("broom")
+library("emmeans")
+
+```
+
+## Tidy
+```{r}
+ld <- language_diversity %>%
+  mutate_if(is.character, as.factor) %>%
+  pivot_wider(names_from = Measurement, 
+              values_from = Value) %>%
+  mutate(lang_log = log(Langs),
+         area_log = log(Area),
+         pop_log = log(Population))
+
+summary(ld)
+str(ld)
+dim(ld)
+glimpse(ld)
+# View(ld)
+
+glimpse(ld)
+
+# ld %>%
+#   ggplot() + 
+#   aes(x = Continent, y = Value) +
+#   geom_point()
+
+ld %>%
+  ggplot() +
+  aes(x = area_log, y = lang_log) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+```
+
+## Analyses
+```{r, 'fit-model'}
+mean(ld$lang_log)
+
+mod_0 <- lm(lang_log ~ 1,                                         data = ld) # intercept-only model: when x is zero/ = mean(ld$lang_log)
+mod_1 <- lm(lang_log ~ 1 + pop_log,                               data = ld) # one unit change of pop_log is associated                                                               with an increase of lang_log by 0.36709
+mod_2 <- lm(lang_log ~ 1 + pop_log + area_log,                    data = ld) # when pop_log and area_log are zero, intercept
+# one unit change of area_log is associated with an increase of lang_log by 0.1557, while holding pop_log constant at zero.
+mod_3 <- lm(lang_log ~ 1 + pop_log * area_log,                    data = ld) # the same as below
+# mod_3 <- lm(lang_log ~ 1 + pop_log + area_log + pop_log:area_log, data = ld)
+summary(mod_0)
+summary(mod_1)
+summary(mod_2)
+summary(mod_3)
+```
+
+## Tables and plots
+Hello, please appreciate @tbl-model.
+
+```{r, tbl-model}
+tidy(mod_3) %>%
+  knitr::kable(format = "pandoc")
+
+```
+
+```{r}
+
+emmeans(
+  object = mod_1,
+  specs = ~ pop_log,
+  at = list(pop_log = seq(0, 20, by = 1))
+)
+
+
+emmeans(
+  object = mod_3,
+  specs = ~ pop_log * area_log,
+  at = list(pop_log = c(0, 10, 20),
+            area_log = c(0, 10, 20))
+)
+```
+
+```{r}
+# 1. 
+my_cars <- mtcars %>%
+  select(mpg, wt, drat)
+
+my_cars <- select(mtcars, mpg, wt, drat)
+
+# 2. 
+
+mod_null <- lm(mpg ~ 1, data = my_cars)
+mod_wt <- lm(mpg ~ wt, data = my_cars)
+mod_add <- lm(mpg ~ wt + drat, data = my_cars)
+mod_int <- lm(mpg ~ wt + drat + wt:drat, data = my_cars)
+
+# 3.
+summary(mod_null)
+mean(mpg) # mean value of dependent variable
+
+summary(mod_wt) # when wt is zero (intercept)
+# p value: Estimate of intercept is not equal to zero.
+R square: This model can explain 74% of the variance.
+# Overall F-statsitscs: at least one of the variables are statistically significant.
+
+# Use a nested model comparison to test the additive effect of 'drat'
+anova(mod_add, mod_wt) # F ration below 1 usually means not significant.
+summary(mod_wt)
+summary(mod_add)
+
+# 
+anova(mod_add, mod_int) # explanatory power changes, so that we want to keep this interaction. 
+# writup
+# The interaction was significant(F(1) = 5.41, p < 0.03)
+# The effect of drat on mpg depends on wt
+
+```

@@ -1,0 +1,83 @@
+library(tidyverse)
+library(ds4ling)
+
+test_scores_rm
+
+# select()
+select(test_scores_rm, id, test2)
+select(test_scores_rm, spec:test2)
+select(test_scores_rm, particpant = id) # new name = old name
+
+glimpse(mtcars)
+select(mtcars, mpg, vs)
+select(mtcars, mpg:vs)
+select(mtcars, displacement = disp)
+
+
+# filter()
+filter(mtcars, mpg < 20 & mpg > 14) # and
+filter(mtcars, cyl == 6)  # equal to
+filter(mtcars, mpg > 20 | disp < 200) # or
+
+filter(test_scores_rm, spec == "g1_lo")
+
+mtcars %>% # and then
+  select(mpg, disp) %>%
+  filter(mpg < 200) %>%
+  ggplot() +
+  aes(x = mpg, y = disp) +
+  geom_point()
+
+# arrange()
+arrange(mtcars, disp) # desc(disp)
+
+# mutate()
+mutate(mtcars, new_col = "hi")
+mutate(my_data, smart = if_else(iq > yes, "yes", "no"))
+
+mtcars %>%
+  select(mpg) %>%
+  mutate(mpg_x2 = mpg * 2,
+         mpg_c = mpg - mean(mpg),
+         value = if_else(mpg >= 18, "good", "bad"))
+
+# summarize()
+
+mtcars %>%
+    group_by(cyl) %>%
+    summarize(avg = mean(mpg),
+              sd = sd(mpg),
+              min = min(mpg),
+              max = max(mpg))
+
+## 2023-02-20
+
+# separate() <-> unite()
+
+test_scores_rm %>%
+  separate(col = id, into = c("lang", "no"), sep = 4) %>%
+  select(-no) %>%
+  separate(col = spec, into = c("group", "level"), sep = "_")
+
+# pivot_longer <-> pivot_wider
+
+test_scores_rm %>%
+  pivot_longer(., col = c("test1", "test2"),      # cols = test1:test2
+               names_to = "test", 
+               values_to = "scores")
+
+scores_long %>%
+  ggplot() + 
+  aes(x = test, y = scores) +
+  geom_boxplot()
+
+test_scores_rm %>%
+  ggplot() +
+  aes(x = test1, y = test2) + 
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# fit a model with the lm() function
+
+mod1 <- lm(mpg ~ wt, data = mtcars)
+summary(mod1)
